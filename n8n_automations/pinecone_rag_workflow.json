@@ -1,0 +1,125 @@
+{
+  "name": "Flight Policy RAG & Gmail Customer Support Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "policy-inquiry",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Customer Inquiry Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT seat_class, base_price, cancellation_fee_percent, is_refundable, policy_description FROM fare_rules;"
+      },
+      "name": "Fetch Live Fare Rules (PostgreSQL)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [320, 300],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-pg-cred",
+          "name": "Supabase PostgreSQL Production Ledger"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "vector",
+        "operation": "query",
+        "indexName": "flight-fare-policies",
+        "topK": 3,
+        "queryText": "={{ $json.body.user_question }}"
+      },
+      "name": "Pinecone Vector RAG Query",
+      "type": "n8n-nodes-pinecone.pinecone",
+      "typeVersion": 1,
+      "position": [540, 300],
+      "credentials": {
+        "pineconeApi": {
+          "id": "pinecone-cred",
+          "name": "Pinecone Vector DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "prompt": "You are a customer support agent for Flight Management System.\nContext from Policy Vector DB:\n{{ $node['Pinecone Vector RAG Query'].json.matches }}\n\nLive Database Fare Rules:\n{{ $node['Fetch Live Fare Rules (PostgreSQL)'].json }}\n\nCustomer Question:\n{{ $node['Customer Inquiry Webhook'].json.body.user_question }}\n\nDraft a concise, accurate email response following exact fare rules."
+      },
+      "name": "Draft Customer Answer (LLM Node)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node['Customer Inquiry Webhook'].json.body.passenger_email }}",
+        "subject": "Re: Flight Fare Policy & Cancellation Inquiry",
+        "message": "={{ $json.message.content }}"
+      },
+      "name": "Send Gmail Response",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [980, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-cred",
+          "name": "Airline Customer Support Gmail API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Customer Inquiry Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Live Fare Rules (PostgreSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Live Fare Rules (PostgreSQL)": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector RAG Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector RAG Query": {
+      "main": [
+        [
+          {
+            "node": "Draft Customer Answer (LLM Node)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Customer Answer (LLM Node)": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
