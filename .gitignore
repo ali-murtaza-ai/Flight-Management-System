@@ -1,26 +1,33 @@
+# Environment Variables
 .env
 .env.*
-!.env.example
+!.env.template
 
+# Virtual Environments
 venv/
 .venv/
 env/
 
+# Python cache & test artifacts
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
+# Databases
 *.db
 *.sqlite
 *.sqlite3
 
-.coverage
-htmlcov/
+# Node dependencies & frontend builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
 dist/
 build/
-*.egg-info/
 
+# IDE files
 .idea/
 .vscode/
+.DS_Store

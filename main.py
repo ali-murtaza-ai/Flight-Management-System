@@ -59,6 +59,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
 # Enable CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -69,7 +73,7 @@ app.add_middleware(
 )
 
 
-@app.get("/", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 def health_check():
     return {
         "status": "online",
@@ -77,6 +81,18 @@ def health_check():
         "dual_writer": "FastAPI (Synchronous API) + n8n (Background Automation Engine)",
         "ledger": "Supabase PostgreSQL"
     }
+
+
+# Mount React static assets from frontend/dist
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+if os.path.exists(frontend_dist_path):
+    assets_path = os.path.join(frontend_dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    def serve_frontend_index():
+        return FileResponse(os.path.join(frontend_dist_path, "index.html"))
 
 
 # ==========================================
